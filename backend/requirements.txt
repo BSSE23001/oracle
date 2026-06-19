@@ -1,0 +1,61 @@
+# ── ORACLE backend dependencies ──────────────────────────────────────────
+# Python target: 3.12 (3.10/3.11/3.13 also supported by these libs).
+#
+# Install with uv for lightning fast speed.
+
+# ── Orchestration ────────────────────────────────────────────────────────
+langgraph
+langgraph-checkpoint-sqlite      # local dev checkpointer (interrupts/HITL persistence)
+langgraph-checkpoint-postgres    # production checkpointer (Supabase)
+
+# ── LLM orchestration framework ────────────────────────────────────────
+langchain
+langchain-openai                 # also used as the OpenRouter client (OpenAI-compatible API)
+langchain-huggingface            # local HF embeddings (no API key required)
+langchain-community              # CrossRef / misc community loaders used by citation tool
+
+# ── Agent tools ─────────────────────────────────────────────────────────
+tavily-python                    # web search built for LLM agents
+pdfplumber                       # table-aware PDF text extraction
+PyMuPDF                          # fast PDF text/layout extraction (imported as `fitz`)
+httpx                            # async HTTP client (CrossRef, generic fetch)
+
+# ── Vector store / embeddings ──────────────────────────────────────────
+chromadb
+sentence-transformers            # backs BAAI/bge-small-en-v1.5 local embeddings
+
+# ── Code-exec sandbox subtasks ─────────────────────────────────────────
+pandas
+numpy
+
+# ── API layer ──────────────────────────────────────────────────────────
+fastapi[standard]
+uvicorn[standard]
+sse-starlette                    # Server-Sent Events streaming responses
+
+# ── Database ───────────────────────────────────────────────────────────
+sqlalchemy
+asyncpg                          # async driver, used by FastAPI request handlers
+psycopg[binary]                  # sync driver, used by Celery tasks + Alembic + PostgresSaver
+alembic
+
+# ── Queue ──────────────────────────────────────────────────────────────
+celery
+redis
+
+# ── Observability ───────────────────────────────────────────────────────
+langsmith
+openevals
+
+# ── Core utilities ──────────────────────────────────────────────────────
+pydantic
+pydantic-settings
+tenacity                         # retry / model-fallback logic
+python-dotenv
+rich                             # pretty console output for local test scripts
+orjson
+
+# ── Dev / testing ───────────────────────────────────────────────────────
+pytest
+pytest-asyncio
+ruff
