@@ -3,7 +3,7 @@ Vector store tool: local persistent Chroma collection used to ingest PDF /
 web content per research session and retrieve relevant chunks for the
 synthesis agent (lightweight RAG over whatever this run has gathered).
 
-Swapping in Qdrant instead: the embedding + chunking logic here is
+Swapping in Qdrant instead: the embedding and chunking logic here is
 store-agnostic. Replace `_get_collection()` and the three public functions
 below with equivalents against `qdrant_client.QdrantClient` and the rest of
 the codebase (agents call only `ingest_document` / `query_similar` /
