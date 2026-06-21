@@ -1,0 +1,21 @@
+target-version = "py312"
+line-length = 120
+
+[lint]
+select = ["E", "F", "I", "UP", "B"]
+ignore = [
+    "E501",  # line length is handled by `line-length` above; a handful of
+             # prompt-string lines legitimately exceed it and that's fine
+    "B008",  # FastAPI's `Depends(...)` as a default argument is the documented
+             # pattern, not the "mutable default" foot-gun this rule targets
+]
+
+[lint.per-file-ignores]
+# B904 ("raise ... from err") is intentionally not enforced inside the
+# fallback boundaries in agents/tools/tasks, those paths log a warning and
+# return a degraded result rather than re-raising at all, by design (see
+# app/core/llm.py's module docstring or other's for examples).
+"app/agents/*.py" = ["B904"]
+"app/tools/*.py" = ["B904"]
+"app/tasks/*.py" = ["B904"]
+"eval/*.py" = ["B904"]

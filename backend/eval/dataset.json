@@ -1,0 +1,34 @@
+[
+  {
+    "query": "What are the main approaches to retrieval-augmented generation?",
+    "notes": "A good answer should distinguish at least two distinct RAG strategies (e.g. dense vector retrieval vs. other approaches) and explain what problem RAG solves in the first place."
+  },
+  {
+    "query": "How effective are GLP-1 drugs for long-term weight maintenance?",
+    "notes": "Should address both efficacy and the durability of effect after stopping the drug, ideally noting that evidence quality/duration varies by study."
+  },
+  {
+    "query": "What's driving the recent rise in global LNG shipping rates?",
+    "notes": "Should identify concrete supply or demand factors rather than vague generalities, and should not invent specific dollar figures it cannot support."
+  },
+  {
+    "query": "What are the tradeoffs between SQL and NoSQL databases for a high-write-throughput application?",
+    "notes": "Should cover consistency/scalability tradeoffs concretely rather than just restating 'it depends' without substance."
+  },
+  {
+    "query": "What is the current scientific consensus on the health effects of intermittent fasting?",
+    "notes": "Should distinguish well-supported claims from preliminary/contested ones rather than presenting all findings with equal confidence."
+  },
+  {
+    "query": "How do central banks decide when to cut interest rates?",
+    "notes": "Should name concrete indicators (inflation, employment data, etc.) policymakers actually look at, not just abstract platitudes."
+  },
+  {
+    "query": "What are the main criticisms of GDP as a measure of economic wellbeing?",
+    "notes": "Should present at least two distinct, substantive criticisms (e.g. distributional effects, unpriced externalities) rather than one vague complaint repeated."
+  },
+  {
+    "query": "What progress has been made on practical quantum error correction in the last few years?",
+    "notes": "This is a fast-moving, technical area — the report should be appropriately hedged about how current the information is and avoid overstating certainty."
+  }
+]
