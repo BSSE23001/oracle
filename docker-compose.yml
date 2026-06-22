@@ -1,0 +1,89 @@
+# Local development stack: Postgres + Redis + the FastAPI api + a Celery
+# worker. Chroma is NOT a service here, it runs embedded (just a folder on
+# disk, see app/tools/vector_store.py) and that folder lives in the
+# `chroma_data` volume shared by the api/worker containers below.
+#
+# First-time setup:
+#   cp backend/.env.example backend/.env   # fill in your 3 API keys
+#   docker compose up -d postgres redis
+#   docker compose run --rm api alembic upgrade head
+#   docker compose up -d
+#
+# Then: API on http://localhost:8000 (see /health), and `docker compose logs -f worker`
+# to watch research runs happen in real time.
+
+services:
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_USER: oracle
+      POSTGRES_PASSWORD: oracle
+      POSTGRES_DB: oracle
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U oracle"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  api:
+    build: ./backend
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+    env_file:
+      - ./backend/.env
+    environment:
+      # Override the .env defaults (which point at "localhost", correct
+      # for running run_local.py directly on your host) with the
+      # in-network service hostnames Docker Compose gives each container.
+      DATABASE_URL: postgresql+asyncpg://oracle:oracle@postgres:5432/oracle
+      REDIS_URL: redis://redis:6379/0
+      CELERY_BROKER_URL: redis://redis:6379/0
+      CELERY_RESULT_BACKEND: redis://redis:6379/1
+      CHECKPOINTER_BACKEND: postgres
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./backend:/app
+      - chroma_data:/app/data
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  worker:
+    build: ./backend
+    command: celery -A app.tasks.celery_app worker --loglevel=info --concurrency=2
+    env_file:
+      - ./backend/.env
+    environment:
+      DATABASE_URL: postgresql+asyncpg://oracle:oracle@postgres:5432/oracle
+      REDIS_URL: redis://redis:6379/0
+      CELERY_BROKER_URL: redis://redis:6379/0
+      CELERY_RESULT_BACKEND: redis://redis:6379/1
+      CHECKPOINTER_BACKEND: postgres
+    volumes:
+      - ./backend:/app
+      - chroma_data:/app/data
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+volumes:
+  postgres_data:
+  chroma_data:
