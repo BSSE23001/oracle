@@ -1,0 +1,103 @@
+@import "tailwindcss";
+
+@theme {
+  --color-ink-900: #0a0e16;
+  --color-ink-800: #0e1420;
+  --color-ink-700: #131a2a;
+  --color-ink-600: #1b2436;
+  --color-ink-500: #283248;
+
+  --color-parchment-100: #ede6d6;
+  --color-parchment-300: #c9c2b0;
+  --color-muted-400: #79829a;
+  --color-muted-500: #8b93a6;
+  --color-muted-600: #5b6378;
+
+  --color-brass-300: #e3b876;
+  --color-brass-400: #dca661;
+  --color-brass-500: #c98a3e;
+  --color-brass-600: #a86f2f;
+
+  --color-teal-400: #6cb8b5;
+  --color-teal-500: #4fa3a0;
+  --color-teal-600: #3a8481;
+
+  --color-rust-400: #cc7259;
+  --color-rust-500: #b5563c;
+  --color-rust-600: #95432d;
+
+  --shadow-panel:
+    0 1px 0 0 rgba(237, 230, 214, 0.06) inset,
+    0 12px 32px -16px rgba(0, 0, 0, 0.6);
+}
+
+/* next/font sets --font-fraunces / --font-source-sans / --font-plex-mono on
+   <html> (see app/layout.tsx); `@theme inline` passes those var()
+   references straight through into Tailwind's generated font-* utilities
+   instead of trying to resolve them to a static value at build time. */
+@theme inline {
+  --font-display: var(--font-fraunces);
+  --font-body: var(--font-source-sans);
+  --font-mono: var(--font-plex-mono);
+}
+
+html {
+  background: var(--color-ink-800);
+  color-scheme: dark;
+}
+
+body {
+  background: var(--color-ink-800);
+  color: var(--color-parchment-100);
+  font-family: var(--font-body);
+  -webkit-font-smoothing: antialiased;
+}
+
+::selection {
+  background: var(--color-brass-500);
+  color: var(--color-ink-900);
+}
+
+* {
+  scrollbar-color: var(--color-ink-500) transparent;
+  scrollbar-width: thin;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+@keyframes signal-sweep {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(100%);
+  }
+}
+
+@keyframes line-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-signal-sweep {
+  animation: signal-sweep 2.4s linear infinite;
+}
+
+.animate-line-in {
+  animation: line-in 0.35s ease-out both;
+}
