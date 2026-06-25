@@ -1,0 +1,74 @@
+[project]
+name = "oracle-backend"
+version = "0.1.0"
+description = "Oracle backend"
+requires-python = ">=3.12"
+
+dependencies = [
+
+    # LangGraph
+    "langgraph",
+    "langgraph-checkpoint-sqlite",
+    "langgraph-checkpoint-postgres",
+
+    # LangChain
+    "langchain",
+    "langchain-openai",
+    "langchain-community",
+    "langchain-huggingface",
+
+    # tools
+    "tavily-python",
+    "pdfplumber",
+    "PyMuPDF",
+    "httpx",
+
+    # embeddings
+    "chromadb",
+    "sentence-transformers",
+
+    # data
+    "numpy",
+    "pandas",
+
+    # api
+    "fastapi[standard]",
+    "uvicorn[standard]",
+    "sse-starlette",
+
+    # db
+    "sqlalchemy",
+    "asyncpg",
+    "psycopg[binary]",
+    "alembic",
+
+    # queue
+    "celery",
+    "redis",
+
+    # observability
+    "langsmith",
+    "openevals",
+
+    # utils
+    "pydantic",
+    "pydantic-settings",
+    "python-dotenv",
+    "tenacity",
+    "rich",
+    "orjson",
+]
+
+[dependency-groups]
+dev = [
+    "pytest",
+    "pytest-asyncio",
+    "ruff",
+]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"

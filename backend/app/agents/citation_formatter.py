@@ -3,26 +3,21 @@ Citation Formatter, the last node in the graph. Deduplicates every source
 gathered across all specialist agents, resolves academic metadata for each
 via CrossRef where possible, maps each draft section's "source_indices"
 (which point at the numbered findings the synthesis agent was shown) to the
-resulting citation ids, and assembles the final `ResearchReport`.
+resulting citation ids, and assembles the final report dict.
 
-Also computes the report's overall `confidence_score`, a blend of how
-confident each specialist agent was in its own findings and how the
-post-synthesis fact-check pass came out.
+State contract: `subtask_results` and `fact_check_verdicts` are lists of
+plain dicts (each is the `.model_dump()` of their respective Pydantic
+models). All node returns use plain dicts so the LangGraph checkpoint
+serializer (msgpack) never encounters unregistered custom types.
 """
 
 from __future__ import annotations
 
 import logging
 
-from app.agents.schemas import (
-    Citation,
-    FactCheckVerdict,
-    ReportSection,
-    ResearchReport,
-    SourceRef,
-    SubtaskResult,
-)
+from app.agents.schemas import Citation, ReportSection, ResearchReport, SourceRef
 from app.agents.state import ResearchState
+from app.agents.utils import coerce_to_dict
 from app.tools.crossref_tool import resolve_citation
 
 logger = logging.getLogger("oracle.agents.citation_formatter")
@@ -66,42 +61,51 @@ class _CitationRegistry:
         return cid
 
 
-def _compute_confidence(
-    results: list[SubtaskResult], fact_checks: list[FactCheckVerdict]
-) -> float:
+def _compute_confidence(results: list, fact_checks: list) -> float:
     if not results:
         return 0.0
 
-    avg_subtask_confidence = sum(r.confidence for r in results) / len(results)
+    results = [coerce_to_dict(r) for r in results]
+    avg_subtask_confidence = sum(r.get("confidence", 0.5) for r in results) / len(
+        results
+    )
 
     if not fact_checks:
         return round(max(0.0, min(1.0, avg_subtask_confidence)), 2)
 
-    supported = sum(1 for f in fact_checks if f.verdict == "supported")
-    contradicted = sum(1 for f in fact_checks if f.verdict == "contradicted")
-    fact_check_signal = (supported - contradicted) / len(fact_checks)  # in [-1, 1]
-    fact_check_score = (fact_check_signal + 1) / 2  # normalize to [0, 1]
+    fact_checks = [coerce_to_dict(f) for f in fact_checks]
+    supported = sum(1 for f in fact_checks if f.get("verdict") == "supported")
+    contradicted = sum(1 for f in fact_checks if f.get("verdict") == "contradicted")
+    fact_check_signal = (supported - contradicted) / len(fact_checks)
+    fact_check_score = (fact_check_signal + 1) / 2
 
     combined = 0.6 * avg_subtask_confidence + 0.4 * fact_check_score
     return round(max(0.0, min(1.0, combined)), 2)
 
 
 def citation_formatter_node(state: ResearchState) -> dict:
-    results: list[SubtaskResult] = state.get("subtask_results", [])
-    fact_checks: list[FactCheckVerdict] = state.get("fact_check_verdicts", [])
+    # Coerce each item to a plain dict, handles both new (plain dict) and
+    # old (Pydantic model deserialized from a pre-fix checkpoint) formats.
+    results: list[dict] = [coerce_to_dict(r) for r in state.get("subtask_results", [])]
+    fact_checks: list[dict] = [
+        coerce_to_dict(f) for f in state.get("fact_check_verdicts", [])
+    ]
 
     registry = _CitationRegistry()
     finding_index_to_citation_ids: dict[int, list[str]] = {}
 
     for i, result in enumerate(results, start=1):
         ids: list[str] = []
-        for source in result.sources:
+        for source_data in result.get("sources", []):
             try:
+                # source_data may be a plain dict (new code) or a SourceRef
+                # object (old checkpoint), model_validate handles both.
+                source = SourceRef.model_validate(coerce_to_dict(source_data))
                 cid = registry.id_for(source)
-            except (
-                Exception
-            ) as exc:  # noqa: BLE001 - CrossRef hiccups must never break report assembly
-                logger.warning("Citation resolution failed for %r: %s", source, exc)
+            except Exception as exc:  # noqa: BLE001
+                logger.warning(
+                    "Citation resolution failed for %r: %s", source_data, exc
+                )
                 cid = None
             if cid:
                 ids.append(cid)
@@ -129,4 +133,6 @@ def citation_formatter_node(state: ResearchState) -> dict:
         citations=registry.citations,
         confidence_score=_compute_confidence(results, fact_checks),
     )
-    return {"report": report}
+    # Serialize to a plain dict, keeps the checkpoint serializer happy and
+    # makes the state consistent (everything is plain dicts, not Pydantic).
+    return {"report": report.model_dump()}

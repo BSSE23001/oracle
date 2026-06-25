@@ -7,6 +7,7 @@ judges a single claim against the retrieved evidence. Used by:
   - `agents/fact_check_pass.py` (the automatic pass that re-checks the
     synthesized report's own key claims before the report is finalized)
 """
+
 from __future__ import annotations
 
 import logging
@@ -39,7 +40,9 @@ def verify_claim(claim: str) -> FactCheckVerdict:
         raw = llm.chat(FACT_CHECK_CLAIM_SYSTEM, user)
     except Exception as exc:  # noqa: BLE001
         logger.warning("Fact-check LLM call failed for claim %r: %s", claim, exc)
-        return FactCheckVerdict(claim=claim, verdict="uncertain", explanation=f"Fact-check failed: {exc}")
+        return FactCheckVerdict(
+            claim=claim, verdict="uncertain", explanation=f"Fact-check failed: {exc}"
+        )
 
     match = _VERDICT_RE.search(raw)
     verdict = match.group(1).lower() if match else "uncertain"
@@ -48,4 +51,6 @@ def verify_claim(claim: str) -> FactCheckVerdict:
 
     explanation = raw[match.end() :].strip() if match else raw.strip()
     sources = [SourceRef(url=h["url"], title=h["title"]) for h in hits]
-    return FactCheckVerdict(claim=claim, verdict=verdict, explanation=explanation, sources=sources)
+    return FactCheckVerdict(
+        claim=claim, verdict=verdict, explanation=explanation, sources=sources
+    )

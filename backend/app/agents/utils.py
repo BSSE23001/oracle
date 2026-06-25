@@ -7,6 +7,27 @@ import re
 _CONFIDENCE_RE = re.compile(r"CONFIDENCE:\s*([0-9]*\.?[0-9]+)", re.IGNORECASE)
 
 
+def coerce_to_dict(obj) -> dict:
+    """Convert a Pydantic model instance OR plain dict to a plain dict.
+
+    Used throughout agent nodes so they work correctly with BOTH:
+      - new code: nodes return `.model_dump()` plain dicts
+      - old checkpoints: LangGraph deserialised stored Pydantic instances back
+        from msgpack and those come out as actual model objects rather than dicts.
+
+    Placing this coercion at every READ site (not just every WRITE site) means
+    the system degrades gracefully during rolling updates instead of crashing.
+    """
+    if isinstance(obj, dict):
+        return obj
+    if hasattr(obj, "model_dump"):
+        return obj.model_dump()
+    try:
+        return dict(obj)
+    except Exception as exc:
+        raise TypeError(f"Cannot coerce {type(obj).__name__!r} to dict") from exc
+
+
 def parse_confidence_suffix(text: str, default: float = 0.5) -> tuple[str, float]:
     """
     Agent prompts ask the model to end its answer with a line like

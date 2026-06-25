@@ -51,7 +51,7 @@ def fact_check_pass_node(state: ResearchState) -> dict:
     verdicts = []
     for claim in claims:
         try:
-            verdicts.append(verify_claim(claim))
+            verdicts.append(verify_claim(claim).model_dump())
         except Exception as exc:  # noqa: BLE001
             logger.warning("Fact-check failed for claim %r: %s", claim, exc)
 

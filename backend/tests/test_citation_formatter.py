@@ -1,9 +1,22 @@
 from app.agents.citation_formatter import _compute_confidence
-from app.agents.schemas import FactCheckVerdict, SourceRef, SubtaskResult, SubtaskType
+from app.agents.schemas import SourceRef
 
 
-def _result(confidence: float) -> SubtaskResult:
-    return SubtaskResult(subtask_id="t1", subtask_type=SubtaskType.WEB_SEARCH, summary="x", confidence=confidence)
+def _result(confidence: float) -> dict:
+    """Build a plain dict matching what specialist agents return (.model_dump())."""
+    return {
+        "subtask_id": "t1",
+        "subtask_type": "web_search",
+        "summary": "x",
+        "sources": [],
+        "confidence": confidence,
+        "raw_excerpt": "",
+        "error": None,
+    }
+
+
+def _verdict(v: str) -> dict:
+    return {"claim": "x", "verdict": v, "explanation": "", "sources": []}
 
 
 def test_compute_confidence_no_results_is_zero():
@@ -17,20 +30,18 @@ def test_compute_confidence_no_fact_checks_uses_average_subtask_confidence():
 
 def test_compute_confidence_blends_in_fact_check_signal():
     results = [_result(0.9)]
-    all_supported = [FactCheckVerdict(claim="x", verdict="supported", explanation="")]
-    all_contradicted = [FactCheckVerdict(claim="x", verdict="contradicted", explanation="")]
+    all_supported = [_verdict("supported")]
+    all_contradicted = [_verdict("contradicted")]
 
     score_supported = _compute_confidence(results, all_supported)
     score_contradicted = _compute_confidence(results, all_contradicted)
 
-    # Same subtask confidence, but a contradicted fact-check should pull
-    # the blended score down relative to an all-supported one.
     assert score_supported > score_contradicted
 
 
 def test_compute_confidence_is_clamped_to_unit_interval():
     results = [_result(1.0)]
-    verdicts = [FactCheckVerdict(claim="x", verdict="supported", explanation="") for _ in range(5)]
+    verdicts = [_verdict("supported") for _ in range(5)]
     score = _compute_confidence(results, verdicts)
     assert 0.0 <= score <= 1.0
 

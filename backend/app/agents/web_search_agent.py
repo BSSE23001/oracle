@@ -34,7 +34,9 @@ def web_search_agent(payload: dict) -> dict:
             confidence=0.0,
             error="empty_search_results",
         )
-        return {"subtask_results": [result]}
+        return {
+            "subtask_results": [result.model_dump()]
+        }  # must match every other return path
 
     for hit in hits:
         if hit.get("content"):
@@ -67,4 +69,4 @@ def web_search_agent(payload: dict) -> dict:
         confidence=confidence,
         raw_excerpt=sources_block[:1500],
     )
-    return {"subtask_results": [result]}
+    return {"subtask_results": [result.model_dump()]}

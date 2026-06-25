@@ -32,7 +32,7 @@ def code_exec_agent(payload: dict) -> dict:
             confidence=0.0,
             error=str(exc),
         )
-        return {"subtask_results": [result]}
+        return {"subtask_results": [result.model_dump()]}
 
     code = strip_code_fences(raw_code)
     exec_result = run_python_code(code)
@@ -46,7 +46,7 @@ def code_exec_agent(payload: dict) -> dict:
             raw_excerpt=code,
             error="blocked",
         )
-        return {"subtask_results": [result]}
+        return {"subtask_results": [result.model_dump()]}
 
     output_block = f"STDOUT:\n{exec_result.stdout}\n\nSTDERR:\n{exec_result.stderr}\n\nExit code: {exec_result.exit_code}"
 
@@ -72,4 +72,4 @@ def code_exec_agent(payload: dict) -> dict:
         confidence=confidence,
         raw_excerpt=f"```python\n{code}\n```\n\n{output_block}"[:2000],
     )
-    return {"subtask_results": [result]}
+    return {"subtask_results": [result.model_dump()]}

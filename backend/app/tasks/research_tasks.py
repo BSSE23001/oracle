@@ -33,6 +33,7 @@ from app.config import settings
 from app.db import crud
 from app.db.session import SyncSessionLocal
 from app.tasks.celery_app import celery_app
+from app.agents.utils import coerce_to_dict
 
 logger = logging.getLogger("oracle.tasks.research")
 
@@ -92,27 +93,51 @@ def _publish_event(
         )
 
 
+_SPECIALIST_NODES = frozenset(
+    {"web_search_agent", "pdf_agent", "code_exec_agent", "fact_check_subtask_agent"}
+)
+
+
 def _drive_graph(graph, graph_input, config: dict, session_id: str) -> None:
-    for chunk in graph.stream(graph_input, config=config, stream_mode="updates"):
-        if "__interrupt__" in chunk:
-            interrupt_payload = chunk["__interrupt__"][0].value
-            with SyncSessionLocal() as db:
-                crud.update_session_status_sync(
-                    db,
-                    session_id,
-                    "awaiting_review",
-                    plan=interrupt_payload.get("plan"),
-                )
-                db.commit()
-            _publish_event(
-                session_id, "plan_review_required", "human_review", interrupt_payload
+    """
+    Drive the graph to completion (or to the next interrupt), publishing
+    every node update as an event.
+    """
+    interrupt_payload = None
+    stream = graph.stream(graph_input, config=config, stream_mode="updates")
+    try:
+        for chunk in stream:
+            if "__interrupt__" in chunk:
+                interrupt_payload = chunk["__interrupt__"][0].value
+                break  # break cleanly; finally block closes the stream
+            for node_name, update in chunk.items():
+                if node_name in _SPECIALIST_NODES:
+                    for r in update.get("subtask_results") or []:
+                        r = coerce_to_dict(
+                            r
+                        )  # handles both dict (new) and SubtaskResult object (old checkpoint)
+                        logger.info(
+                            "[PARALLEL] Agent %-28s done — subtask %s, confidence %.0f%%",
+                            node_name,
+                            r.get("subtask_id", "?"),
+                            r.get("confidence", 0) * 100,
+                        )
+                _publish_event(session_id, "node_update", node_name, update)
+    finally:
+        stream.close()  # always close explicitly, prevents GeneratorExit from surfacing as an error
+
+    if interrupt_payload is not None:
+        with SyncSessionLocal() as db:
+            crud.update_session_status_sync(
+                db, session_id, "awaiting_review", plan=interrupt_payload.get("plan")
             )
-            return  # the task ends here; resume_research_task picks it back up later
+            db.commit()
+        _publish_event(
+            session_id, "plan_review_required", "human_review", interrupt_payload
+        )
+        return
 
-        for node_name, update in chunk.items():
-            _publish_event(session_id, "node_update", node_name, update)
-
-    # The stream ended without another interrupt -> the graph reached END.
+    # Stream ended without another interrupt → the graph reached END.
     state_snapshot = graph.get_state(config)
     report = state_snapshot.values.get("report") if state_snapshot else None
 

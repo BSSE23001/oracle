@@ -66,4 +66,6 @@ def run_oracle_target(inputs: dict) -> dict:
             "error": "no_report_produced",
         }
 
-    return {**report.model_dump(), "error": None}
+    # report is already a plain dict (citation_formatter_node serializes
+    # with .model_dump() before storing in state)
+    return {**report, "error": None}

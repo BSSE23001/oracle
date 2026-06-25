@@ -13,8 +13,8 @@ import logging
 from pydantic import BaseModel, Field
 
 from app.agents.prompts import SYNTHESIS_SYSTEM
-from app.agents.schemas import SubtaskResult
 from app.agents.state import ResearchState
+from app.agents.utils import coerce_to_dict
 from app.core.llm import get_default_llm
 
 logger = logging.getLogger("oracle.agents.synthesis")
@@ -32,20 +32,29 @@ class _SynthesisOutput(BaseModel):
     sections: list[_SynthesisSection]
 
 
-def _build_findings_block(results: list[SubtaskResult]) -> str:
+def _build_findings_block(results: list) -> str:
     if not results:
         return "(no findings were gathered)"
     lines = []
-    for i, r in enumerate(results, start=1):
+    for i, raw in enumerate(results, start=1):
+        r = coerce_to_dict(
+            raw
+        )  # handles SubtaskResult objects (old checkpoints) and plain dicts (new code)
+        subtask_id = r.get("subtask_id", "?")
+        subtask_type = r.get("subtask_type", "unknown")
+        confidence = r.get("confidence", 0.0)
+        summary = r.get("summary", "")
         lines.append(
-            f"Finding [{i}] (subtask {r.subtask_id}, type={r.subtask_type.value}, "
-            f"confidence={r.confidence:.2f}):\n{r.summary}\n"
+            f"Finding [{i}] (subtask {subtask_id}, type={subtask_type}, "
+            f"confidence={confidence:.2f}):\n{summary}\n"
         )
     return "\n".join(lines)
 
 
 def synthesis_agent(state: ResearchState) -> dict:
-    results: list[SubtaskResult] = state.get("subtask_results", [])
+    results: list = state.get(
+        "subtask_results", []
+    )  # may be dicts (new) or SubtaskResult objects (old checkpoint)
     query = state["query"]
     findings_block = _build_findings_block(results)
 
