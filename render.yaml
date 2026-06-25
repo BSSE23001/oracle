@@ -1,0 +1,151 @@
+# Render Blueprint for ORACLE's backend (the two long-running Python
+# services: the FastAPI api and the Celery worker). Postgres deliberately
+# is NOT defined here — DATABASE_URL points at a Supabase project instead
+# (see docs/DEPLOYMENT.md for why: it matches the original "PostgreSQL
+# (Supabase)" spec, and avoids Render free Postgres's 30-day expiry).
+#
+# Setup (full walkthrough in docs/04_DEPLOYMENT.md):
+#   1. In the Render Dashboard: New > Blueprint > connect this repo.
+#   2. Render reads this file and proposes the `oracle-api` web service,
+#      `oracle-worker` background worker, and `oracle-redis` Key Value
+#      instance below.
+#   3. For every `sync: false` env var, Render prompts you to paste a
+#      value during Blueprint creation (your OpenRouter/Tavily/LangSmith
+#      keys, your Supabase DATABASE_URL, etc.), nothing secret lives in
+#      this file or in git.
+#   4. `autoDeploy: false` on both services is intentional, deploys are
+#      triggered by the `deploy-backend.yml` GitHub Actions workflow only
+#      after CI passes, via the deploy hook URLs Render gives each service
+#      (copy those into your repo's GitHub Actions secrets, see
+#      docs/DEPLOYMENT.md).
+#
+# NOTE on cost: Render's `worker` service type is not available on the
+# free plan, the Celery worker needs at least a Starter instance.
+# The `api` web service CAN run on Render's free plan,
+# with the caveat that free web services spin down
+# after 15 minutes of inactivity (so the first request after idling takes
+# 30-60s to wake up — fine for a demo, not for a production SLA). See
+# docs/DEPLOYMENT.md for exact current numbers and cheaper alternatives
+# if you want to avoid any worker cost while testing.
+
+services:
+  - type: web
+    name: oracle-api
+    runtime: docker
+    repo: https://github.com/YOUR_GITHUB_USERNAME/oracle.git # replace with your fork's URL
+    rootDir: backend
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    plan: free
+    region: oregon
+    autoDeploy: false
+    healthCheckPath: /health
+    envVars:
+      - key: APP_ENV
+        value: production
+      - key: LOG_LEVEL
+        value: INFO
+      - key: CHECKPOINTER_BACKEND
+        value: postgres
+      - key: OPENROUTER_API_KEY
+        sync: false
+      - key: OPENROUTER_MODELS
+        sync: false
+      - key: TAVILY_API_KEY
+        sync: false
+      - key: LANGSMITH_TRACING
+        value: "true"
+      - key: LANGSMITH_API_KEY
+        sync: false
+      - key: LANGSMITH_PROJECT
+        value: oracle-research-assistant
+      - key: CROSSREF_MAILTO
+        sync: false
+      - key: EMBEDDING_PROVIDER
+        value: huggingface
+      # Supabase Supavisor pooler, transaction mode (port 6543), see
+      # docs/DEPLOYMENT.md for exactly how to copy this from your
+      # Supabase project's Connect dialog.
+      - key: DATABASE_URL
+        sync: false
+      - key: REDIS_URL
+        fromService:
+          type: keyvalue
+          name: oracle-redis
+          property: connectionString
+      - key: CELERY_BROKER_URL
+        fromService:
+          type: keyvalue
+          name: oracle-redis
+          property: connectionString
+      - key: CELERY_RESULT_BACKEND
+        fromService:
+          type: keyvalue
+          name: oracle-redis
+          property: connectionString
+      - key: CORS_ALLOW_ORIGINS
+        sync: false # set to your Vercel production URL, e.g. https://oracle.vercel.app
+
+  - type: worker
+    name: oracle-worker
+    runtime: docker
+    repo: https://github.com/YOUR_GITHUB_USERNAME/oracle.git # replace with your fork's URL
+    rootDir: backend
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    dockerCommand: celery -A app.tasks.celery_app worker --loglevel=info --concurrency=2
+    plan: starter # background workers are not available on the free plan
+    region: oregon
+    autoDeploy: false
+    envVars:
+      - key: APP_ENV
+        value: production
+      - key: LOG_LEVEL
+        value: INFO
+      - key: CHECKPOINTER_BACKEND
+        value: postgres
+      - key: OPENROUTER_API_KEY
+        sync: false
+      - key: OPENROUTER_MODELS
+        sync: false
+      - key: TAVILY_API_KEY
+        sync: false
+      - key: LANGSMITH_TRACING
+        value: "true"
+      - key: LANGSMITH_API_KEY
+        sync: false
+      - key: LANGSMITH_PROJECT
+        value: oracle-research-assistant
+      - key: CROSSREF_MAILTO
+        sync: false
+      - key: EMBEDDING_PROVIDER
+        value: huggingface
+      # NOTE: unlike the api service above, the worker should point at
+      # Supabase's SESSION-mode pooler (port 5432), not transaction mode
+      # (6543), Celery tasks and the LangGraph Postgres checkpointer hold
+      # longer-lived connections than a typical web request, which session
+      # mode supports and transaction mode does not. See
+      # docs/DEPLOYMENT.md for the exact connection string to use here.
+      - key: DATABASE_URL
+        sync: false
+      - key: REDIS_URL
+        fromService:
+          type: keyvalue
+          name: oracle-redis
+          property: connectionString
+      - key: CELERY_BROKER_URL
+        fromService:
+          type: keyvalue
+          name: oracle-redis
+          property: connectionString
+      - key: CELERY_RESULT_BACKEND
+        fromService:
+          type: keyvalue
+          name: oracle-redis
+          property: connectionString
+
+  - type: keyvalue
+    name: oracle-redis
+    plan: free
+    region: oregon
+    ipAllowList: [] # private network only, not reachable from outside Render
