@@ -1,5 +1,6 @@
 """Supervisor agent — decomposes the query into a ResearchPlan, and revises
 that plan if the human-in-the-loop checkpoint comes back with feedback."""
+
 from __future__ import annotations
 
 import logging
@@ -27,7 +28,9 @@ def supervisor_node(state: ResearchState) -> dict:
 
     try:
         if is_revision:
-            system = PLAN_REVISION_SYSTEM.format(max_subtasks=settings.max_subtasks_per_plan)
+            system = PLAN_REVISION_SYSTEM.format(
+                max_subtasks=settings.max_subtasks_per_plan
+            )
             previous_plan = state["plan"]
             if isinstance(previous_plan, dict):
                 previous_plan = ResearchPlan.model_validate(previous_plan)
@@ -38,15 +41,35 @@ def supervisor_node(state: ResearchState) -> dict:
             )
             plan = llm.generate_structured(system, user, ResearchPlan)
         else:
-            system = SUPERVISOR_SYSTEM.format(max_subtasks=settings.max_subtasks_per_plan)
-            plan = llm.generate_structured(system, f"Research query: {query}", ResearchPlan)
+            system = SUPERVISOR_SYSTEM.format(
+                max_subtasks=settings.max_subtasks_per_plan
+            )
+            plan = llm.generate_structured(
+                system, f"Research query: {query}", ResearchPlan
+            )
     except Exception as exc:  # noqa: BLE001
-        logger.warning("Plan generation failed (%s); falling back to a single web_search subtask.", exc)
-        plan = state.get("plan") or _fallback_plan(query)
+        logger.warning(
+            "Plan generation failed (%s); falling back to a single web_search subtask.",
+            exc,
+        )
+        raw = state.get("plan")
+        if raw is not None:
+            plan = ResearchPlan.model_validate(raw) if isinstance(raw, dict) else raw
+        else:
+            plan = _fallback_plan(query)
 
     if not plan.subtasks:
         plan.subtasks = _fallback_plan(query).subtasks
 
     plan.subtasks = plan.subtasks[: settings.max_subtasks_per_plan]
 
-    return {"plan": plan, "plan_approved": False, "plan_revision_notes": ""}
+    # Serialize to a plain dict before storing in LangGraph state. The
+    # checkpoint serializer (msgpack via PostgresSaver) doesn't know about
+    # custom Pydantic classes and warns (and will hard-error in a future
+    # LangGraph release) when it encounters unregistered types. Plain dicts
+    # round-trip through msgpack without any registration required.
+    return {
+        "plan": plan.model_dump(),
+        "plan_approved": False,
+        "plan_revision_notes": "",
+    }

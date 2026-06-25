@@ -31,4 +31,4 @@ def fact_check_subtask_agent(payload: dict) -> dict:
         sources=verdict.sources,
         confidence=confidence,
     )
-    return {"subtask_results": [result]}
+    return {"subtask_results": [result.model_dump()]}

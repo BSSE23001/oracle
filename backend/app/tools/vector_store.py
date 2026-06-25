@@ -3,20 +3,23 @@ Vector store tool: local persistent Chroma collection used to ingest PDF /
 web content per research session and retrieve relevant chunks for the
 synthesis agent (lightweight RAG over whatever this run has gathered).
 
-Swapping in Qdrant instead: the embedding and chunking logic here is
-store-agnostic. Replace `_get_collection()` and the three public functions
-below with equivalents against `qdrant_client.QdrantClient` and the rest of
-the codebase (agents call only `ingest_document` / `query_similar` /
-`reset_session`) needs no changes. We default to Chroma because it needs
-zero external service for local dev (just a directory on disk), where
-Qdrant wants either a running server or its (heavier) embedded mode.
+Thread-safety note: LangGraph's parallel Send fan-out runs specialist agents
+in a ThreadPoolExecutor, so `ingest_document` (called by each agent after a
+successful search/read) is called from multiple threads simultaneously on the
+first research run. `@lru_cache` is NOT thread-safe for this: all N threads
+can simultaneously enter `_get_client()` before any of them has populated the
+cache, causing N simultaneous calls to `chromadb.PersistentClient(path=...)`.
+Chroma's internal `SharedSystemClient._identifier_to_system` dict suffers a
+write-then-read race, producing a `KeyError` on the return statement. The fix
+is a module-level instance + a `threading.Lock` with double-checked locking so
+only one thread ever calls `PersistentClient` and the rest wait for it.
 """
 
 from __future__ import annotations
 
 import hashlib
 import logging
-from functools import lru_cache
+import threading
 from typing import TypedDict
 
 import chromadb
@@ -26,22 +29,46 @@ from app.core.embeddings import get_embeddings
 
 logger = logging.getLogger("oracle.tools.vector_store")
 
+# ── Thread-safe singletons ───────────────────────────────────────────────────
+# Double-checked locking: the fast path (non-None check) avoids acquiring the
+# lock on every call after initialisation; the inner check inside the lock
+# prevents duplicate initialisation if two threads both pass the outer check.
+
+_chroma_lock = threading.Lock()
+_chroma_client: chromadb.ClientAPI | None = None
+_chroma_collection: chromadb.Collection | None = None
+
+
+def _get_client() -> chromadb.ClientAPI:
+    global _chroma_client
+    if _chroma_client is None:
+        with _chroma_lock:
+            if _chroma_client is None:
+                logger.debug(
+                    "Initialising Chroma PersistentClient at %s",
+                    settings.chroma_persist_dir,
+                )
+                _chroma_client = chromadb.PersistentClient(
+                    path=settings.chroma_persist_dir
+                )
+    return _chroma_client
+
+
+def _get_collection() -> chromadb.Collection:
+    global _chroma_collection
+    if _chroma_collection is None:
+        with _chroma_lock:
+            if _chroma_collection is None:
+                _chroma_collection = _get_client().get_or_create_collection(
+                    name=settings.chroma_collection_name
+                )
+    return _chroma_collection
+
 
 class RetrievedChunk(TypedDict):
     text: str
     source: str
     score: float
-
-
-@lru_cache
-def _get_client() -> chromadb.ClientAPI:
-    return chromadb.PersistentClient(path=settings.chroma_persist_dir)
-
-
-@lru_cache
-def _get_collection():
-    client = _get_client()
-    return client.get_or_create_collection(name=settings.chroma_collection_name)
 
 
 def chunk_text(text: str, chunk_size: int = 900, overlap: int = 150) -> list[str]:

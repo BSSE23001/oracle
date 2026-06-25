@@ -55,7 +55,7 @@ def pdf_agent(payload: dict) -> dict:
             confidence=confidence
             * 0.8,  # slightly discount confidence since this wasn't the intended path
         )
-        return {"subtask_results": [result]}
+        return {"subtask_results": [result.model_dump()]}
 
     pdf_result = read_pdf(source)
     if pdf_result.error:
@@ -66,7 +66,7 @@ def pdf_agent(payload: dict) -> dict:
             confidence=0.0,
             error=pdf_result.error,
         )
-        return {"subtask_results": [result]}
+        return {"subtask_results": [result.model_dump()]}
 
     ingest_document(
         session_id,
@@ -95,4 +95,4 @@ def pdf_agent(payload: dict) -> dict:
         confidence=confidence,
         raw_excerpt=document_block[:1500],
     )
-    return {"subtask_results": [result]}
+    return {"subtask_results": [result.model_dump()]}

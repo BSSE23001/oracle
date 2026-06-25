@@ -109,6 +109,14 @@ def _route_after_human_review(state: ResearchState) -> str | list[Send]:
     plan = state["plan"]
     if isinstance(plan, dict):
         plan = ResearchPlan.model_validate(plan)
+
+    agent_summary = ", ".join(f"{s.type.value}({s.id})" for s in plan.subtasks)
+    logger.info(
+        "[PARALLEL] Dispatching %d specialist agents simultaneously → %s",
+        len(plan.subtasks),
+        agent_summary,
+    )
+
     return [
         Send(
             _NODE_FOR_SUBTASK_TYPE[subtask.type],

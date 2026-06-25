@@ -4,11 +4,11 @@ partial dict; LangGraph merges partial updates back in using the reducer
 attached to each `Annotated` field below.
 
 `subtask_results` and `fact_check_verdicts` use `operator.add` because
-multiple specialist agents run in parallel and each contributes one
-item to the list. LangGraph concatenates those contributions across
-the parallel branches rather than the default "last write wins" behaviour,
-which is what lets four agents run concurrently without clobbering each
-other's results.
+multiple specialist agents run in parallel (via `Send`, see
+`agents/graph.py`) and each contributes one item to the list, LangGraph
+concatenates those contributions across the parallel branches rather than
+the default "last write wins" behaviour, which is what lets four agents
+run concurrently without clobbering each other's results.
 """
 
 from __future__ import annotations
@@ -57,7 +57,7 @@ class ResearchState(TypedDict, total=False):
 
 
 def initial_state(query: str, session_id: str) -> ResearchState:
-    """Build a fully-initialized state dict for graph
+    """Build a fully-initialized state dict for graph.invoke()/.stream(),
     explicitly seeding the reducer-backed list fields avoids KeyErrors in
     node code that reads them before anything has appended to them."""
     return ResearchState(
