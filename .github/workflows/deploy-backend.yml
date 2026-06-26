@@ -1,0 +1,52 @@
+name: Deploy backend (Render)
+
+# # Render's GitHub integration can auto-deploy on every push by itself, but
+# # that races ahead of CI, a syntax error could be live in production
+# # before `ci.yml` even finishes. This workflow instead waits for `CI` to
+# # report success on `main`, then PURELY triggers Render's deploy hooks
+# # (no build happens here, Render does its own build from the Dockerfile
+# # inside backend/, you're just telling it "go" instead of relying on its
+# # automatic per-push trigger). Set `autoDeploy: false` on both services in
+# # render.yaml so Render doesn't *also* deploy directly on push, this
+# # workflow becomes the single source of truth for "is CI green yet."
+# on:
+#   workflow_run:
+#     workflows: ["CI"]
+#     branches: [main]
+#     types: [completed]
+
+# jobs:
+#   deploy:
+#     name: Trigger Render deploy hooks
+#     runs-on: ubuntu-latest
+#     if: github.event.workflow_run.conclusion == 'success'
+#     steps:
+#       - name: Trigger api service deploy
+#         run: curl -fsS -X POST "${{ secrets.RENDER_DEPLOY_HOOK_API }}"
+
+#       - name: Trigger worker service deploy
+#         run: curl -fsS -X POST "${{ secrets.RENDER_DEPLOY_HOOK_WORKER }}"
+
+# Currently We are going for manual deploy triggers as follows:
+
+on:
+  workflow_dispatch:
+    inputs:
+      service:
+        description: "Which service to deploy (api/worker/all)"
+        required: true
+        default: "all"
+
+jobs:
+  deploy:
+    name: Trigger Render deploy hooks
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Trigger API deploy
+        if: ${{ github.event.inputs.service == 'api' || github.event.inputs.service == 'all' }}
+        run: curl -fsS -X POST "${{ secrets.RENDER_DEPLOY_HOOK_API }}"
+
+      - name: Trigger Worker deploy
+        if: ${{ github.event.inputs.service == 'worker' || github.event.inputs.service == 'all' }}
+        run: curl -fsS -X POST "${{ secrets.RENDER_DEPLOY_HOOK_WORKER }}"

@@ -1,0 +1,89 @@
+name: Deploy frontend (Vercel)
+
+# # Same CI-gating rationale as deploy-backend.yml. Uses the official Vercel
+# # CLI (`vercel pull` -> `vercel build` -> `vercel deploy --prebuilt`)
+# # rather than a third-party Action, this is the flow Vercel's own docs
+# # recommend, and it means the exact artifact that was built in CI is what
+# # gets deployed (no separate, potentially-different build happening on
+# # Vercel's own infrastructure).
+# on:
+#   workflow_run:
+#     workflows: ["CI"]
+#     branches: [main]
+#     types: [completed]
+
+# jobs:
+#   deploy:
+#     name: Build and deploy to Vercel
+#     runs-on: ubuntu-latest
+#     if: github.event.workflow_run.conclusion == 'success'
+#     env:
+#       VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+#       VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+#     defaults:
+#       run:
+#         working-directory: frontend
+#     steps:
+#       - uses: actions/checkout@v4
+
+#       - uses: actions/setup-node@v4
+#         with:
+#           node-version: "22"
+
+#       - name: Install Vercel CLI
+#         run: npm install --global vercel@latest
+
+#       - name: Pull Vercel project settings
+#         run: vercel pull --yes --environment=production --token="${{ secrets.VERCEL_TOKEN }}"
+
+#       - name: Build (production)
+#         run: vercel build --prod --token="${{ secrets.VERCEL_TOKEN }}"
+
+#       - name: Deploy prebuilt artifact
+#         run: vercel deploy --prebuilt --prod --token="${{ secrets.VERCEL_TOKEN }}"
+
+# Currently We are going for manual deploy triggers as follows:
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: "Deployment environment"
+        required: true
+        default: "production"
+        type: choice
+        options:
+          - production
+          - preview
+
+jobs:
+  deploy:
+    name: Build and deploy to Vercel
+    runs-on: ubuntu-latest
+
+    env:
+      VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+      VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+
+    defaults:
+      run:
+        working-directory: frontend
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Install Vercel CLI
+        run: npm install --global vercel@latest
+
+      - name: Pull Vercel project settings
+        run: vercel pull --yes --environment=production --token="${{ secrets.VERCEL_TOKEN }}"
+
+      - name: Build (production)
+        run: vercel build --prod --token="${{ secrets.VERCEL_TOKEN }}"
+
+      - name: Deploy prebuilt artifact
+        run: vercel deploy --prebuilt --prod --token="${{ secrets.VERCEL_TOKEN }}"

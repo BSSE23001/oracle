@@ -1,0 +1,30 @@
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+*.egg-info/
+.pytest_cache/
+
+# Env / secrets
+.env
+.env.*
+!.env.example
+
+# Local data (Chroma persistence, sqlite checkpoints, downloaded HF models)
+backend/data/
+*.sqlite
+*.sqlite3
+
+# Node / Next.js (Phase 3+)
+node_modules/
+.next/
+out/
+
+# OS / editor
+.DS_Store
+.vscode/
+.idea/
+
+# Logs
+*.log

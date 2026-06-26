@@ -1,0 +1,53 @@
+name: Evaluate report quality
+
+# Deliberately NOT triggered on every push, each run makes real
+# OpenRouter + Tavily API calls across the whole eval dataset (~10-20
+# minutes, a meaningful chunk of free-tier quota). Use this to spot-check
+# quality after meaningfully changing a prompt (app/agents/prompts.py) or
+# swapping models, not as a per-commit gate. Run on:
+#   - manual dispatch (Actions tab → "Evaluate report quality" → Run workflow)
+#   - a weekly schedule, to catch silent regressions (e.g. an OpenRouter
+#     free model being swapped out from under you) even with no code changes
+on:
+  workflow_dispatch: {}
+  # Eliminating the Schedule for now
+  # schedule:
+  #   - cron: "0 6 * * 1" # Mondays, 06:00 UTC
+
+jobs:
+  evaluate:
+    name: Run LangSmith evaluation
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: "pip"
+          cache-dependency-path: backend/requirements.txt
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Run evaluation
+        env:
+          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+          OPENROUTER_MODELS: ${{ secrets.OPENROUTER_MODELS }}
+          TAVILY_API_KEY: ${{ secrets.TAVILY_API_KEY }}
+          LANGSMITH_TRACING: "true"
+          LANGSMITH_API_KEY: ${{ secrets.LANGSMITH_API_KEY }}
+          LANGSMITH_PROJECT: oracle-report-quality-evals
+          CROSSREF_MAILTO: ${{ secrets.CROSSREF_MAILTO }}
+          CHECKPOINTER_BACKEND: sqlite
+          CHECKPOINTER_SQLITE_PATH: ./data/eval_checkpoints.sqlite
+          CHROMA_PERSIST_DIR: ./data/eval_chroma
+        run: |
+          mkdir -p data
+          python -m eval.run_eval
