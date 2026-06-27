@@ -18,7 +18,7 @@ from __future__ import annotations
 import json
 import logging
 import re
-from typing import Type, TypeVar
+from typing import TypeVar
 
 from langchain_core.messages import AIMessage, BaseMessage, HumanMessage, SystemMessage
 from langchain_openai import ChatOpenAI
@@ -136,7 +136,7 @@ class FallbackLLM:
         self,
         system: str,
         user: str,
-        schema: Type[T],
+        schema: type[T],
         max_repair_attempts: int = 1,
     ) -> T:
         """
@@ -210,7 +210,7 @@ class FallbackLLM:
         )
 
 
-def _schema_hint(schema: Type[BaseModel]) -> str:
+def _schema_hint(schema: type[BaseModel]) -> str:
     """A compact, human-readable field listing instead of a raw JSON-Schema
     dump, free models follow short examples far more reliably than a
     full JSON-Schema document with defs and refs."""

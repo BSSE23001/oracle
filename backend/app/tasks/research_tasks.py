@@ -23,17 +23,17 @@ from __future__ import annotations
 
 import json
 import logging
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from enum import Enum
 
 import redis as redis_sync
 from langgraph.types import Command
 
+from app.agents.utils import coerce_to_dict
 from app.config import settings
 from app.db import crud
 from app.db.session import SyncSessionLocal
 from app.tasks.celery_app import celery_app
-from app.agents.utils import coerce_to_dict
 
 logger = logging.getLogger("oracle.tasks.research")
 
@@ -79,7 +79,7 @@ def _publish_event(
             "node": node_name,
             "data": safe_data,
             "sequence": sequence,
-            "ts": datetime.now(timezone.utc).isoformat(),
+            "ts": datetime.now(UTC).isoformat(),
         },
         default=str,
     )
