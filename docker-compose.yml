@@ -12,9 +12,40 @@
 # Then: API on http://localhost:8000 (see /health), and `docker compose logs -f worker`
 # to watch research runs happen in real time.
 
+x-backend-common: &backend-common
+  build:
+    context: ./backend
+    dockerfile: Dockerfile
+  env_file:
+    - ./backend/.env
+  environment:
+    DATABASE_URL: postgresql+asyncpg://oracle:oracle@postgres:5432/oracle
+    REDIS_URL: redis://redis:6379/0
+    CELERY_BROKER_URL: redis://redis:6379/0
+    CELERY_RESULT_BACKEND: redis://redis:6379/1
+    CHECKPOINTER_BACKEND: postgres
+    HF_HOME: /cache/huggingface
+    TRANSFORMERS_CACHE: /cache/huggingface
+    PYTHONUNBUFFERED: "1"
+  depends_on:
+    postgres:
+      condition: service_healthy
+    redis:
+      condition: service_healthy
+  restart: unless-stopped
+  volumes:
+    - chroma_data:/app/data
+    - huggingface_cache:/cache/huggingface
+  logging:
+    driver: json-file
+    options:
+      max-size: "10m"
+      max-file: "3"
+
 services:
   postgres:
     image: postgres:17-alpine
+    restart: unless-stopped
     environment:
       POSTGRES_USER: oracle
       POSTGRES_PASSWORD: oracle
@@ -24,66 +55,56 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U oracle"]
+      test: ["CMD-SHELL", "pg_isready -U oracle -d oracle"]
       interval: 5s
       timeout: 5s
       retries: 10
 
   redis:
     image: redis:7-alpine
+    restart: unless-stopped
+    command:
+      - redis-server
+      - --appendonly
+      - "yes"
     ports:
       - "6379:6379"
+    volumes:
+      - redis_data:/data
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 5s
-      timeout: 5s
+      timeout: 3s
       retries: 10
 
   api:
-    build: ./backend
-    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
-    env_file:
-      - ./backend/.env
-    environment:
-      # Override the .env defaults (which point at "localhost", correct
-      # for running run_local.py directly on your host) with the
-      # in-network service hostnames Docker Compose gives each container.
-      DATABASE_URL: postgresql+asyncpg://oracle:oracle@postgres:5432/oracle
-      REDIS_URL: redis://redis:6379/0
-      CELERY_BROKER_URL: redis://redis:6379/0
-      CELERY_RESULT_BACKEND: redis://redis:6379/1
-      CHECKPOINTER_BACKEND: postgres
+    <<: *backend-common
+    command:
+      - uv
+      - run
+      - uvicorn
+      - app.main:app
+      - --host
+      - 0.0.0.0
+      - --port
+      - "8000"
     ports:
       - "8000:8000"
-    volumes:
-      - ./backend:/app
-      - chroma_data:/app/data
-    depends_on:
-      postgres:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
 
   worker:
-    build: ./backend
-    command: celery -A app.tasks.celery_app worker --loglevel=info --concurrency=2
-    env_file:
-      - ./backend/.env
-    environment:
-      DATABASE_URL: postgresql+asyncpg://oracle:oracle@postgres:5432/oracle
-      REDIS_URL: redis://redis:6379/0
-      CELERY_BROKER_URL: redis://redis:6379/0
-      CELERY_RESULT_BACKEND: redis://redis:6379/1
-      CHECKPOINTER_BACKEND: postgres
-    volumes:
-      - ./backend:/app
-      - chroma_data:/app/data
-    depends_on:
-      postgres:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
+    <<: *backend-common
+    command:
+      - uv
+      - run
+      - celery
+      - -A
+      - app.tasks.celery_app
+      - worker
+      - --loglevel=info
+      - --concurrency=2
 
 volumes:
   postgres_data:
+  redis_data:
   chroma_data:
+  huggingface_cache:
