@@ -6,7 +6,7 @@ from __future__ import annotations
 import logging
 
 from app.agents.prompts import WEB_SEARCH_AGENT_SYSTEM
-from app.agents.schemas import Subtask, SourceRef, SubtaskResult
+from app.agents.schemas import SourceRef, Subtask, SubtaskResult
 from app.agents.utils import parse_confidence_suffix
 from app.core.llm import get_default_llm
 from app.tools.vector_store import ingest_document

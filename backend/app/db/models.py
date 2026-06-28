@@ -53,10 +53,10 @@ class ResearchSession(Base):
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
     )
 
-    report: Mapped["ResearchReport | None"] = relationship(
+    report: Mapped[ResearchReport | None] = relationship(
         back_populates="session", uselist=False, cascade="all, delete-orphan"
     )
-    events: Mapped[list["AgentEvent"]] = relationship(
+    events: Mapped[list[AgentEvent]] = relationship(
         back_populates="session",
         cascade="all, delete-orphan",
         order_by="AgentEvent.sequence",
@@ -82,7 +82,7 @@ class ResearchReport(Base):
     )
 
     session: Mapped[ResearchSession] = relationship(back_populates="report")
-    feedback_entries: Mapped[list["Feedback"]] = relationship(
+    feedback_entries: Mapped[list[Feedback]] = relationship(
         back_populates="report", cascade="all, delete-orphan"
     )
 

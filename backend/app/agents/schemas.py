@@ -7,12 +7,12 @@ schemas and the DB layer.
 
 from __future__ import annotations
 
-from enum import Enum
+from enum import StrEnum
 
 from pydantic import BaseModel, Field
 
 
-class SubtaskType(str, Enum):
+class SubtaskType(StrEnum):
     WEB_SEARCH = "web_search"
     PDF_READER = "pdf_reader"
     CODE_EXEC = "code_exec"

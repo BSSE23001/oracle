@@ -53,7 +53,6 @@ import logging
 import sqlite3
 import threading
 from pathlib import Path
-from typing import Optional
 
 from langgraph.checkpoint.base import BaseCheckpointSaver
 from langgraph.graph import END, START, StateGraph
@@ -92,7 +91,7 @@ _SPECIALIST_NODES = (
 # One graph instance per worker process.  A threading.Lock guards against
 # the (unlikely but possible) case of two Celery tasks spawning in the same
 # process before the first one has finished building the graph.
-_process_graph: Optional[CompiledStateGraph] = None
+_process_graph: CompiledStateGraph | None = None
 _process_graph_lock = threading.Lock()
 
 

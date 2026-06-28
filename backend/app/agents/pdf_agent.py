@@ -12,7 +12,7 @@ from __future__ import annotations
 import logging
 
 from app.agents.prompts import PDF_AGENT_SYSTEM, WEB_SEARCH_AGENT_SYSTEM
-from app.agents.schemas import Subtask, SourceRef, SubtaskResult
+from app.agents.schemas import SourceRef, Subtask, SubtaskResult
 from app.agents.utils import parse_confidence_suffix
 from app.core.llm import get_default_llm
 from app.tools.pdf_tools import format_for_prompt, read_pdf

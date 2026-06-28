@@ -137,7 +137,7 @@ def query_similar(session_id: str, query: str, k: int = 5) -> list[RetrievedChun
     distances = (results.get("distances") or [[]])[0]
 
     out: list[RetrievedChunk] = []
-    for doc, meta, dist in zip(documents, metadatas, distances):
+    for doc, meta, dist in zip(documents, metadatas, distances, strict=False):
         # Chroma returns a distance (lower = more similar); convert to a
         # 0-1 "similarity-ish" score for display purposes.
         score = max(0.0, 1.0 - float(dist))
