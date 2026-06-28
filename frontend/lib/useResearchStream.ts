@@ -14,6 +14,14 @@ import type {
   SubtaskType,
 } from "./types";
 
+export interface LogEntry {
+  type: AgentEventType;
+  node: string | null;
+  sequence: number;
+  ts: number;
+  summary: string;
+}
+
 export type LaneStatus = "running" | "done" | "error";
 
 export interface AgentLane {
