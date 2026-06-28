@@ -2,6 +2,7 @@
 name = "oracle-backend"
 version = "0.1.0"
 description = "Oracle backend"
+readme = "README.md"
 requires-python = ">=3.12"
 
 dependencies = [
@@ -17,40 +18,40 @@ dependencies = [
     "langchain-community",
     "langchain-huggingface",
 
-    # tools
+    # Tools
     "tavily-python",
     "pdfplumber",
     "PyMuPDF",
     "httpx",
 
-    # embeddings
+    # Embeddings
     "chromadb",
     "sentence-transformers",
 
-    # data
+    # Data
     "numpy",
     "pandas",
 
-    # api
+    # API
     "fastapi[standard]",
     "uvicorn[standard]",
     "sse-starlette",
 
-    # db
+    # Database
     "sqlalchemy",
     "asyncpg",
     "psycopg[binary]",
     "alembic",
 
-    # queue
+    # Queue
     "celery",
     "redis",
 
-    # observability
+    # Observability
     "langsmith",
     "openevals",
 
-    # utils
+    # Utils
     "pydantic",
     "pydantic-settings",
     "python-dotenv",
@@ -59,6 +60,10 @@ dependencies = [
     "orjson",
 ]
 
+###############################################################################
+# Development Dependencies
+###############################################################################
+
 [dependency-groups]
 dev = [
     "pytest",
@@ -66,9 +71,42 @@ dev = [
     "ruff",
 ]
 
+###############################################################################
+# Build System
+###############################################################################
+
+[build-system]
+requires = ["hatchling>=1.27.0"]
+build-backend = "hatchling.build"
+
+###############################################################################
+# Hatchling Configuration
+###############################################################################
+
+[tool.hatch.build.targets.wheel]
+packages = ["app"]
+
+###############################################################################
+# Ruff
+###############################################################################
+
 [tool.ruff]
 line-length = 100
 target-version = "py312"
 
+[tool.ruff.lint]
+select = [
+    "E",
+    "F",
+    "I",
+    "UP",
+    "B",
+]
+
+###############################################################################
+# Pytest
+###############################################################################
+
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
+testpaths = ["tests"]
