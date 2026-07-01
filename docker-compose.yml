@@ -11,11 +11,19 @@
 #
 # Then: API on http://localhost:8000 (see /health), and `docker compose logs -f worker`
 # to watch research runs happen in real time.
-
+#
+# SPEED NOTE: this file relies on BuildKit cache mounts defined in
+# backend/Dockerfile. Make sure BuildKit is actually on:
+#   export DOCKER_BUILDKIT=1
+#   export COMPOSE_BAKE=true      # lets `docker compose build` use buildx bake,
+#                                  # which parallelizes + shares cache between
+#                                  # api and worker instead of building twice.
 x-backend-common: &backend-common
   build:
     context: ./backend
     dockerfile: Dockerfile
+    # api and worker share this exact image; with COMPOSE_BAKE=true (see note
+    # above) compose builds it once via buildx bake instead of twice.
   env_file:
     - ./backend/.env
   environment:

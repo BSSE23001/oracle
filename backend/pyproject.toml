@@ -4,53 +4,42 @@ version = "0.1.0"
 description = "Oracle backend"
 readme = "README.md"
 requires-python = ">=3.12"
-
 dependencies = [
-
     # LangGraph
     "langgraph",
     "langgraph-checkpoint-sqlite",
     "langgraph-checkpoint-postgres",
-
     # LangChain
     "langchain",
     "langchain-openai",
     "langchain-community",
     "langchain-huggingface",
-
     # Tools
     "tavily-python",
     "pdfplumber",
     "PyMuPDF",
     "httpx",
-
     # Embeddings
     "chromadb",
     "sentence-transformers",
-
     # Data
     "numpy",
     "pandas",
-
     # API
     "fastapi[standard]",
     "uvicorn[standard]",
     "sse-starlette",
-
     # Database
     "sqlalchemy",
     "asyncpg",
     "psycopg[binary]",
     "alembic",
-
     # Queue
     "celery",
     "redis",
-
     # Observability
     "langsmith",
     "openevals",
-
     # Utils
     "pydantic",
     "pydantic-settings",
@@ -63,7 +52,6 @@ dependencies = [
 ###############################################################################
 # Development Dependencies
 ###############################################################################
-
 [dependency-groups]
 dev = [
     "pytest",
@@ -74,7 +62,6 @@ dev = [
 ###############################################################################
 # Build System
 ###############################################################################
-
 [build-system]
 requires = ["hatchling>=1.27.0"]
 build-backend = "hatchling.build"
@@ -82,14 +69,12 @@ build-backend = "hatchling.build"
 ###############################################################################
 # Hatchling Configuration
 ###############################################################################
-
 [tool.hatch.build.targets.wheel]
 packages = ["app"]
 
 ###############################################################################
 # Ruff
 ###############################################################################
-
 [tool.ruff]
 line-length = 100
 target-version = "py312"
@@ -106,7 +91,21 @@ select = [
 ###############################################################################
 # Pytest
 ###############################################################################
-
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
 testpaths = ["tests"]
+
+###############################################################################
+# Torch — force CPU-only wheels (torch is a transitive dep via
+# sentence-transformers / langchain-huggingface). GPU wheels pull in
+# nvidia-cublas-cu12, nvidia-cudnn-cu12, nvidia-cusparse-cu12,
+# nvidia-nccl-cu12, etc. — several GB combined. CPU wheels are ~150-200MB
+# and nothing here runs inference on GPU.
+###############################################################################
+[tool.uv.sources]
+torch = [{ index = "pytorch-cpu" }]
+
+[[tool.uv.index]]
+name = "pytorch-cpu"
+url = "https://download.pytorch.org/whl/cpu"
+explicit = true
