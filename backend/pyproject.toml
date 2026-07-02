@@ -22,6 +22,7 @@ dependencies = [
     # Embeddings
     "chromadb",
     "sentence-transformers",
+    "torch",
     # Data
     "numpy",
     "pandas",
@@ -98,9 +99,9 @@ testpaths = ["tests"]
 ###############################################################################
 # Torch — force CPU-only wheels (torch is a transitive dep via
 # sentence-transformers / langchain-huggingface). GPU wheels pull in
-# nvidia-cublas-cu12, nvidia-cudnn-cu12, nvidia-cusparse-cu12,
-# nvidia-nccl-cu12, etc. — several GB combined. CPU wheels are ~150-200MB
-# and nothing here runs inference on GPU.
+# nvidia-cublas, nvidia-cudnn-cu13, cuda-bindings, cuda-toolkit, etc. —
+# several GB combined. CPU wheels are ~150-200MB and nothing here runs
+# inference on GPU.
 ###############################################################################
 [tool.uv.sources]
 torch = [{ index = "pytorch-cpu" }]
@@ -109,3 +110,20 @@ torch = [{ index = "pytorch-cpu" }]
 name = "pytorch-cpu"
 url = "https://download.pytorch.org/whl/cpu"
 explicit = true
+
+###############################################################################
+# Resolution environment
+###############################################################################
+# By default `uv lock` does a UNIVERSAL resolution across Windows/macOS/Linux
+# simultaneously. The pytorch CPU index above doesn't publish wheels for
+# every platform in that matrix, so uv silently falls back to plain PyPI
+# (== the CUDA build) for torch when it can't satisfy all platforms from one
+# index. This app only ever runs inside the Linux Docker container, so we
+# restrict resolution to that single environment. This also makes the lock
+# resolve deterministically to the CPU wheel.
+[tool.uv]
+environments = [
+    "sys_platform == 'linux' and platform_machine == 'x86_64'",
+]
+
+

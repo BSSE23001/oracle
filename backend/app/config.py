@@ -127,14 +127,28 @@ settings = get_settings()
 
 def configure_langsmith_env() -> None:
     """
-    LangChain/LangSmith read tracing config from environment variables at
-    import/call time, not from our Settings object. Call this once at
-    process startup so every LangChain/LangGraph call downstream is automatically traced.
+    LangChain/LangSmith read tracing configuration from environment variables
+    at import/call time, not from our Settings object.  Call this once at
+    process startup (FastAPI lifespan AND Celery worker_process_init) so every
+    LangChain/LangGraph call downstream is automatically traced.
+
+    We set BOTH the modern ``LANGSMITH_*`` variables (required by the current
+    langsmith SDK ≥ 0.1) AND the legacy ``LANGCHAIN_*`` aliases (for backwards
+    compatibility with older pinned versions of langchain-core/langsmith).
+    Docs: https://docs.langchain.com/langsmith/trace-with-langchain
+          https://docs.langchain.com/langsmith/trace-with-langgraph
     """
     if settings.langsmith_tracing and settings.langsmith_api_key:
+        # Modern variables (langsmith SDK >= 0.1, current standard)
+        os.environ["LANGSMITH_TRACING"] = "true"
+        os.environ["LANGSMITH_API_KEY"] = settings.langsmith_api_key
+        os.environ["LANGSMITH_PROJECT"] = settings.langsmith_project
+        os.environ["LANGSMITH_ENDPOINT"] = settings.langsmith_endpoint
+        # Legacy aliases (langchain-core < 0.2 / older langsmith versions)
         os.environ["LANGCHAIN_TRACING_V2"] = "true"
         os.environ["LANGCHAIN_API_KEY"] = settings.langsmith_api_key
         os.environ["LANGCHAIN_PROJECT"] = settings.langsmith_project
         os.environ["LANGCHAIN_ENDPOINT"] = settings.langsmith_endpoint
     else:
+        os.environ["LANGSMITH_TRACING"] = "false"
         os.environ["LANGCHAIN_TRACING_V2"] = "false"

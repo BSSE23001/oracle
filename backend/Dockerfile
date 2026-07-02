@@ -11,6 +11,11 @@ ENV \
     UV_COMPILE_BYTECODE=1 \
     PIP_DISABLE_PIP_VERSION_CHECK=1 \
     PIP_NO_CACHE_DIR=1
+
+ENV UV_HTTP_TIMEOUT=300
+ENV PATH="/app/.venv/bin:$PATH"
+ENV UV_CACHE_DIR=/tmp/uv-cache
+
 WORKDIR /app
 
 # apt layer: cached via mount instead of re-fetched every build
@@ -23,12 +28,15 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
         git
 
 # Install uv (pinned, cached by digest — this layer basically never rebuilds)
-COPY --from=ghcr.io/astral-sh/uv:0.8.15 /uv /uvx /bin/
+# NOTE: must land in /usr/local/bin, not /bin — the runtime stage below only
+# copies /usr/local from this stage, so anything placed in /bin is silently
+# dropped and you get "exec: uv: executable file not found in $PATH".
+COPY --from=ghcr.io/astral-sh/uv:0.8.15 /uv /uvx /usr/local/bin/
 
 ###############################################################################
 # Dependency layer — only invalidated when pyproject.toml / uv.lock change
 ###############################################################################
-COPY pyproject.toml uv.lock ./
+COPY pyproject.toml README.md uv.lock ./
 RUN --mount=type=cache,target=/root/.cache/uv,sharing=locked \
     uv sync \
         --frozen \
@@ -60,7 +68,8 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
     --mount=type=cache,target=/var/lib/apt,sharing=locked \
     apt-get update && \
     apt-get install -y --no-install-recommends \
-        curl
+        curl \
+        gosu
 
 # Copy installed packages
 COPY --from=builder /usr/local /usr/local
@@ -72,9 +81,10 @@ COPY --from=builder /app /app
 ###############################################################################
 RUN addgroup --system app && \
     adduser --system --ingroup app app
-RUN mkdir -p /cache/huggingface && \
-    chown -R app:app /cache /app
-USER app
+RUN mkdir -p /cache/huggingface /app/data/chroma && \
+    chown -R app:app /cache /app && \
+    chmod +x /app/docker-entrypoint.sh
+ENTRYPOINT ["/app/docker-entrypoint.sh"]
 
 ###############################################################################
 # Healthcheck

@@ -71,7 +71,9 @@ def _parse_item(item: dict) -> CitationMetadata:
 def lookup_by_doi(doi: str) -> CitationMetadata | None:
     try:
         resp = httpx.get(
-            f"{CROSSREF_BASE}/works/{doi}", headers=_headers(), timeout=15.0
+            f"{CROSSREF_BASE}/works/{doi}",
+            headers=_headers(),
+            timeout=httpx.Timeout(connect=3.0, read=5.0, write=5.0, pool=5.0),
         )
         resp.raise_for_status()
         return _parse_item(resp.json()["message"])
@@ -86,7 +88,7 @@ def search_by_title(title: str, rows: int = 1) -> list[CitationMetadata]:
             f"{CROSSREF_BASE}/works",
             params={"query.bibliographic": title, "rows": rows},
             headers=_headers(),
-            timeout=15.0,
+            timeout=httpx.Timeout(connect=3.0, read=5.0, write=5.0, pool=5.0),
         )
         resp.raise_for_status()
         items = resp.json().get("message", {}).get("items", [])

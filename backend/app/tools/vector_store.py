@@ -57,9 +57,10 @@ def _get_client() -> chromadb.ClientAPI:
 def _get_collection() -> chromadb.Collection:
     global _chroma_collection
     if _chroma_collection is None:
+        client = _get_client()
         with _chroma_lock:
             if _chroma_collection is None:
-                _chroma_collection = _get_client().get_or_create_collection(
+                _chroma_collection = client.get_or_create_collection(
                     name=settings.chroma_collection_name
                 )
     return _chroma_collection

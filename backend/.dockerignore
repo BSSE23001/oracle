@@ -31,7 +31,6 @@ data/
 
 # CI / docs
 .github
-README.md
 docs/
 
 # Anything Docker-related that shouldn't invalidate cache

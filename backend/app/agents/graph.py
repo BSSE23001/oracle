@@ -153,7 +153,7 @@ def build_graph(checkpointer: BaseCheckpointSaver | None = None) -> CompiledStat
     builder.add_edge("citation_formatter", END)
 
     return builder.compile(
-        checkpointer=checkpointer if checkpointer is not None else _make_checkpointer()
+        checkpointer=checkpointer if checkpointer is not None else _make_checkpointer(),
     )
 
 

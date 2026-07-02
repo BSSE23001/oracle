@@ -53,6 +53,8 @@ export interface ResearchStreamState {
   report: ResearchReport | null;
   errorMessage: string | null;
   lastSequence: number;
+  /** Ordered list of every event received, for the Activity Log sidebar. */
+  log: LogEntry[];
 }
 
 const initialState: ResearchStreamState = {
@@ -65,6 +67,7 @@ const initialState: ResearchStreamState = {
   report: null,
   errorMessage: null,
   lastSequence: 0,
+  log: [],
 };
 
 const EVENT_TYPES: AgentEventType[] = [
@@ -75,6 +78,54 @@ const EVENT_TYPES: AgentEventType[] = [
   "session_completed",
   "session_failed",
 ];
+
+/** Build a human-readable summary string for a given event. */
+function buildSummary(event: ParsedAgentEvent): string {
+  switch (event.type) {
+    case "session_started": {
+      const d = event.data as { query: string };
+      return `Session started — "${d.query.slice(0, 60)}${d.query.length > 60 ? "…" : ""}"`;
+    }
+    case "plan_review_required":
+      return "Research plan ready — awaiting your review";
+    case "plan_decision_received": {
+      const d = event.data as { approved: boolean; feedback?: string };
+      return d.approved
+        ? "Plan approved — dispatching specialist agents"
+        : `Plan revision requested${d.feedback ? `: ${d.feedback.slice(0, 60)}` : ""}`;
+    }
+    case "node_update": {
+      const d = event.data as NodeUpdatePayload;
+      const node = event.node ?? "agent";
+      if (d.subtask_results) {
+        const done = d.subtask_results.filter((r) => !r.error).length;
+        const erred = d.subtask_results.filter((r) => !!r.error).length;
+        return `${node}: ${done} subtask${done !== 1 ? "s" : ""} done${erred ? `, ${erred} error${erred !== 1 ? "s" : ""}` : ""}`;
+      }
+      if (d.draft_sections) {
+        return `${node}: draft sections produced (${d.draft_sections.length})`;
+      }
+      if (d.fact_check_verdicts) {
+        return `${node}: ${d.fact_check_verdicts.length} fact-check verdict${d.fact_check_verdicts.length !== 1 ? "s" : ""}`;
+      }
+      if (d.report) {
+        return `${node}: report formatted with ${d.report.citations.length} citation${d.report.citations.length !== 1 ? "s" : ""}`;
+      }
+      if (d.plan) {
+        return `${node}: research plan created (${d.plan.subtasks.length} subtasks)`;
+      }
+      return `${node}: update received`;
+    }
+    case "session_completed":
+      return "✓ Research completed — report ready";
+    case "session_failed": {
+      const d = event.data as { error: string };
+      return `✕ Session failed: ${d.error?.slice(0, 80) ?? "unknown error"}`;
+    }
+    default:
+      return event.type;
+  }
+}
 
 function reducer(
   state: ResearchStreamState,
@@ -92,15 +143,25 @@ function reducer(
     lastSequence: Math.max(state.lastSequence, event.sequence),
   };
 
+  // Append the event to the activity log
+  const newLogEntry: LogEntry = {
+    type: event.type,
+    node: event.node,
+    sequence: event.sequence,
+    ts: Date.now(),
+    summary: buildSummary(event),
+  };
+  const log = [...state.log, newLogEntry];
+
   switch (event.type) {
     case "session_started": {
       const data = event.data as { query: string };
-      return { ...base, phase: "planning", query: data.query };
+      return { ...base, log, phase: "planning", query: data.query };
     }
 
     case "plan_review_required": {
       const data = event.data as PlanReviewRequiredPayload;
-      return { ...base, phase: "awaiting_review", plan: data.plan };
+      return { ...base, log, phase: "awaiting_review", plan: data.plan };
     }
 
     case "plan_decision_received": {
@@ -116,6 +177,7 @@ function reducer(
         );
         return {
           ...base,
+          log,
           phase: "dispatching",
           lanes,
           planRevisionFeedback: null,
@@ -123,6 +185,7 @@ function reducer(
       }
       return {
         ...base,
+        log,
         phase: "planning",
         planRevisionFeedback: data.feedback ?? null,
       };
@@ -143,27 +206,29 @@ function reducer(
               : lane,
           );
         }
-        return { ...base, phase: "dispatching", lanes };
+        return { ...base, log, phase: "dispatching", lanes };
       }
       if (data.draft_sections) {
-        return { ...base, phase: "synthesizing" };
+        return { ...base, log, phase: "synthesizing" };
       }
       if (data.fact_check_verdicts) {
         return {
           ...base,
+          log,
           phase: "fact_checking",
           factCheckVerdicts: data.fact_check_verdicts,
         };
       }
       if (data.report) {
-        return { ...base, phase: "formatting_citations", report: data.report };
+        return { ...base, log, phase: "formatting_citations", report: data.report };
       }
-      return base;
+      return { ...base, log };
     }
 
     case "session_completed": {
       return {
         ...base,
+        log,
         phase: "completed",
         report: event.data as ResearchReport,
       };
@@ -171,11 +236,11 @@ function reducer(
 
     case "session_failed": {
       const data = event.data as { error: string };
-      return { ...base, phase: "failed", errorMessage: data.error };
+      return { ...base, log, phase: "failed", errorMessage: data.error };
     }
 
     default:
-      return base;
+      return { ...base, log };
   }
 }
 

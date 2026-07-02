@@ -35,6 +35,7 @@ x-backend-common: &backend-common
     HF_HOME: /cache/huggingface
     TRANSFORMERS_CACHE: /cache/huggingface
     PYTHONUNBUFFERED: "1"
+    UV_CACHE_DIR: /tmp/uv-cache
   depends_on:
     postgres:
       condition: service_healthy

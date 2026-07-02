@@ -3,42 +3,34 @@
 import { useEffect, useRef } from "react";
 import type { LogEntry } from "@/lib/useResearchStream";
 
-const EVENT_ICON: Record<string, string> = {
-  session_started: "◎",
-  plan_review_required: "⊡",
-  plan_decision_received: "▶",
-  session_completed: "✓",
-  session_failed: "✕",
-  node_update: "·",
+const EVENT_ICON: Record<string, { icon: string; color: string }> = {
+  session_started:        { icon: "◎", color: "text-cobalt-500" },
+  plan_review_required:   { icon: "⊡", color: "text-amber-500" },
+  plan_decision_received: { icon: "▶", color: "text-emerald-500" },
+  session_completed:      { icon: "✓", color: "text-emerald-600" },
+  session_failed:         { icon: "✕", color: "text-crimson-500" },
+  node_update:            { icon: "·", color: "text-gray-400" },
 };
 
-const NODE_COLOR: Record<string, string> = {
-  supervisor: "text-honey-700",
-  human_review: "text-marigold-600",
-  web_search_agent: "text-cobalt-600",
-  pdf_agent: "text-cobalt-600",
-  code_exec_agent: "text-cobalt-600",
-  fact_check_subtask_agent: "text-cobalt-600",
-  synthesis_agent: "text-fern-700",
-  fact_check_pass: "text-fern-700",
-  citation_formatter: "text-fern-700",
+const NODE_DOT: Record<string, string> = {
+  supervisor:                "bg-amber-400",
+  human_review:              "bg-amber-500",
+  web_search_agent:          "bg-cobalt-500",
+  pdf_agent:                 "bg-amber-500",
+  code_exec_agent:           "bg-violet-500",
+  fact_check_subtask_agent:  "bg-emerald-500",
+  synthesis_agent:           "bg-emerald-600",
+  fact_check_pass:           "bg-emerald-600",
+  citation_formatter:        "bg-amber-600",
 };
 
 function fmtTime(ts: number): string {
-  const d = new Date(ts);
-  return d.toLocaleTimeString(undefined, {
-    hour12: false,
-    hour: "2-digit",
-    minute: "2-digit",
-    second: "2-digit",
-  });
+  return new Date(ts).toLocaleTimeString(undefined, { hour12: false, hour: "2-digit", minute: "2-digit", second: "2-digit" });
 }
-
 function fmtDelta(ts: number, prev: number | null): string {
   if (prev === null) return "";
-  const delta = Math.round((ts - prev) / 1000);
-  if (delta < 1) return "";
-  return `+${delta}s`;
+  const d = Math.round((ts - prev) / 1000);
+  return d >= 1 ? `+${d}s` : "";
 }
 
 interface ActivityLogProps {
@@ -50,7 +42,6 @@ interface ActivityLogProps {
 export function ActivityLog({ entries, open, onClose }: ActivityLogProps) {
   const bottomRef = useRef<HTMLDivElement>(null);
 
-  /* Auto-scroll to bottom when new entries arrive */
   useEffect(() => {
     if (open && bottomRef.current) {
       bottomRef.current.scrollIntoView({ behavior: "smooth" });
@@ -59,109 +50,76 @@ export function ActivityLog({ entries, open, onClose }: ActivityLogProps) {
 
   if (!open) return null;
 
-  const runningCount = entries.filter(
-    (e) =>
-      e.type === "plan_decision_received" &&
-      !entries.some(
-        (e2) => e2.type === "session_completed" || e2.type === "session_failed",
-      ),
-  ).length; // just used for the header label
+  const isParallelAgent = (node: string | null) =>
+    node ? ["web_search_agent", "pdf_agent", "code_exec_agent", "fact_check_subtask_agent"].includes(node) : false;
 
   return (
     <>
-      {/* Backdrop (mobile) */}
-      <div
-        className="fixed inset-0 z-30 bg-carbon-900/20 lg:hidden"
-        onClick={onClose}
-        aria-hidden
-      />
+      {/* Backdrop */}
+      <div className="fixed inset-0 z-30 bg-gray-900/20 backdrop-blur-[2px] lg:hidden" onClick={onClose} aria-hidden />
 
       {/* Panel */}
-      <aside className="fixed right-0 top-0 z-40 flex h-full w-80 flex-col border-l border-cream-200 bg-white shadow-card-md">
+      <aside className="animate-slide-in-right fixed right-0 top-16 z-40 flex h-[calc(100vh-4rem)] w-84 flex-col border-l border-gray-200 bg-white shadow-xl">
         {/* Header */}
-        <div className="flex items-center justify-between border-b border-cream-200 px-4 py-3">
-          <div>
-            <h2 className="font-display text-sm font-semibold text-carbon-900">
-              Activity log
-            </h2>
-            <p className="font-mono text-[10px] text-carbon-300">
-              {entries.length} event{entries.length !== 1 ? "s" : ""}
-            </p>
+        <div className="flex shrink-0 items-center justify-between border-b border-gray-100 bg-gradient-to-r from-gray-50 to-white px-5 py-4">
+          <div className="flex items-center gap-2.5">
+            <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-gradient-to-br from-cobalt-500 to-cobalt-700 text-white text-sm shadow-sm">
+              📋
+            </span>
+            <div>
+              <h2 className="font-mono text-xs font-bold tracking-wider text-gray-800 uppercase">Activity Log</h2>
+              <p className="font-mono text-[10px] text-gray-400">
+                {entries.length} event{entries.length !== 1 ? "s" : ""}
+              </p>
+            </div>
           </div>
           <button
             onClick={onClose}
-            className="rounded p-1 text-carbon-400 hover:bg-cream-100 hover:text-carbon-700 transition-colors"
+            className="flex h-8 w-8 items-center justify-center rounded-lg text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-700"
             aria-label="Close activity log"
           >
             ✕
           </button>
         </div>
 
-        {/* Parallel execution note */}
+        {/* Parallel note */}
         {entries.some((e) => e.type === "plan_decision_received") && (
-          <div className="border-b border-cream-200 bg-cobalt-50 px-4 py-2">
-            <p className="font-mono text-[11px] text-cobalt-700">
-              ● Specialist agents run in parallel threads — events arrive as
-              each finishes, not in dispatch order
+          <div className="shrink-0 border-b border-cobalt-100 bg-cobalt-50 px-5 py-2.5">
+            <p className="font-mono text-[10px] text-cobalt-700">
+              ⚡ Specialist agents run in parallel — events arrive as each finishes
             </p>
           </div>
         )}
 
-        {/* Log entries */}
+        {/* Entries */}
         <div className="flex-1 overflow-y-auto px-3 py-3 space-y-0.5">
           {entries.length === 0 ? (
-            <p className="py-6 text-center font-mono text-[11px] text-carbon-300">
-              Waiting for events…
-            </p>
+            <div className="flex flex-col items-center py-12 text-center">
+              <div className="mb-3 h-8 w-8 animate-spin-slow rounded-full border-2 border-gray-200 border-t-cobalt-400" />
+              <p className="font-mono text-[11px] text-gray-400">Waiting for events…</p>
+            </div>
           ) : (
             entries.map((entry, i) => {
-              const prev = i > 0 ? entries[i - 1].ts : null;
-              const delta = fmtDelta(entry.ts, prev);
-              const nodeColor = entry.node
-                ? (NODE_COLOR[entry.node] ?? "text-carbon-500")
-                : "text-carbon-300";
-              const isParallelAgent =
-                entry.node &&
-                [
-                  "web_search_agent",
-                  "pdf_agent",
-                  "code_exec_agent",
-                  "fact_check_subtask_agent",
-                ].includes(entry.node);
-
+              const prev    = i > 0 ? entries[i - 1].ts : null;
+              const delta   = fmtDelta(entry.ts, prev);
+              const ev      = EVENT_ICON[entry.type] ?? { icon: "·", color: "text-gray-400" };
+              const dotBg   = entry.node ? (NODE_DOT[entry.node] ?? "bg-gray-300") : "bg-gray-200";
+              const isParal = isParallelAgent(entry.node);
               return (
                 <div
                   key={entry.sequence}
-                  className={`group flex gap-2 rounded px-2 py-1.5 transition-colors hover:bg-cream-50 ${
-                    isParallelAgent ? "border-l-2 border-cobalt-100 pl-2" : ""
-                  }`}
+                  className={`group flex gap-2 rounded-xl px-3 py-2 transition-colors hover:bg-gray-50 ${isParal ? "border-l-2 border-cobalt-200 ml-1" : ""}`}
                 >
-                  {/* Icon */}
-                  <span
-                    className={`mt-0.5 shrink-0 font-mono text-[12px] ${nodeColor}`}
-                  >
-                    {EVENT_ICON[entry.type] ?? "·"}
-                  </span>
-
-                  {/* Body */}
+                  <span className={`mt-0.5 shrink-0 font-mono text-[13px] ${ev.color}`}>{ev.icon}</span>
                   <div className="min-w-0 flex-1">
-                    <p className="font-body text-[12px] text-carbon-700 leading-snug">
-                      {entry.summary}
-                    </p>
-                    <div className="mt-0.5 flex items-center gap-2">
-                      <span className="font-mono text-[10px] text-carbon-300">
-                        {fmtTime(entry.ts)}
-                      </span>
-                      {delta && (
-                        <span className="font-mono text-[10px] text-carbon-300">
-                          {delta}
-                        </span>
-                      )}
+                    <p className="text-[12px] text-gray-700 leading-snug">{entry.summary}</p>
+                    <div className="mt-0.5 flex flex-wrap items-center gap-1.5">
+                      <span className="font-mono text-[10px] text-gray-400">{fmtTime(entry.ts)}</span>
+                      {delta && <span className="font-mono text-[10px] text-gray-300">{delta}</span>}
                       {entry.node && (
-                        <span className={`font-mono text-[10px] ${nodeColor}`}>
-                          {entry.node.replace(/_agent$|_/g, (m) =>
-                            m === "_agent" ? "" : " ",
-                          )}
+                        <span className="flex items-center gap-1 font-mono text-[10px] text-gray-500">
+                          <span className={`h-1.5 w-1.5 rounded-full ${dotBg}`} />
+                          {entry.node.replace(/_agent$/, "").replace(/_/g, " ")}
                         </span>
                       )}
                     </div>
@@ -174,17 +132,11 @@ export function ActivityLog({ entries, open, onClose }: ActivityLogProps) {
         </div>
 
         {/* Footer legend */}
-        <div className="border-t border-cream-200 bg-cream-50 px-4 py-2">
-          <div className="flex gap-4 font-mono text-[10px] text-carbon-300">
-            <span>
-              <span className="text-cobalt-600">|</span> parallel agents
-            </span>
-            <span>
-              <span className="text-honey-700">◎</span> plan/review
-            </span>
-            <span>
-              <span className="text-fern-700">✓</span> synthesis
-            </span>
+        <div className="shrink-0 border-t border-gray-100 bg-gray-50 px-5 py-3">
+          <div className="flex flex-wrap gap-3 font-mono text-[10px] text-gray-400">
+            <span className="flex items-center gap-1"><span className="h-1.5 w-1.5 rounded-full bg-cobalt-500" /> parallel</span>
+            <span className="flex items-center gap-1"><span className="h-1.5 w-1.5 rounded-full bg-amber-500" /> planning</span>
+            <span className="flex items-center gap-1"><span className="h-1.5 w-1.5 rounded-full bg-emerald-500" /> synthesis</span>
           </div>
         </div>
       </aside>
